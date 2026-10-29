@@ -1,0 +1,54 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agentforce Ticketing Simulator</title>
+<style>
+:root{--bg:#f3f6f9;--panel:#fff;--ink:#16325c;--mut:#5c6b80;--line:#d8dde6;--blue:#0b5cab;--red:#ba0517;--grn:#2e844a;--amb:#b86e00}
+@media(prefers-color-scheme:dark){:root{--bg:#10151c;--panel:#1a222d;--ink:#e6ecf5;--mut:#9aa8bd;--line:#2c394a;--blue:#5aa9f5}}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+header{display:flex;gap:6px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{font-size:16px;margin:0 16px 0 0}
+nav button{border:0;background:none;color:var(--mut);padding:8px 12px;font:inherit;cursor:pointer;border-bottom:2px solid transparent}
+nav button[aria-selected=true]{color:var(--blue);border-color:var(--blue);font-weight:600}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+main{max-width:1100px;margin:16px auto;padding:0 16px}.view{display:none}.view.on{display:block}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:16px}@media(max-width:760px){.split{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px}
+.row{padding:10px;border-bottom:1px solid var(--line);cursor:pointer}.row:hover,.row.sel{background:color-mix(in srgb,var(--blue) 10%,transparent)}
+.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;color:#fff;background:var(--mut)}
+.Severe,.Negative,.High{background:var(--red)}.Positive,.Low{background:var(--grn)}.Medium{background:var(--amb)}.Platinum\ VIP{background:#5a2d91}.Gold{background:#b8860b}
+button.p{background:var(--blue);color:#fff;border:0;border-radius:4px;padding:7px 12px;font:inherit;cursor:pointer}
+input,textarea{width:100%;padding:8px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink);font:inherit}
+.chat{height:300px;overflow:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:8px}.m{padding:8px 10px;border-radius:8px;max-width:85%}.u{background:var(--blue);color:#fff;align-self:flex-end}.a{background:var(--bg);border:1px solid var(--line)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}.kpi b{font-size:34px;display:block}
+table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid var(--line);text-align:left}
+</style></head><body>
+<header><h1>Agentforce Service</h1><nav role="tablist" id="tabs"></nav></header>
+<main>
+<section class="view on" id="console"><div class="split"><div class="card" id="list" aria-label="Cases"></div><div class="card" id="detail"><p>Select a case.</p></div></div></section>
+<section class="view" id="portal"><div class="split"><div class="card"><h2>How can we help?</h2><input id="kq" placeholder="Search articles" aria-label="Search articles"><div id="kb"></div></div>
+<div class="card"><h2>Chat with Agentforce</h2><div class="chat" id="chat" aria-live="polite"></div><div style="display:flex;gap:8px"><input id="msg" placeholder="Describe your issue" aria-label="Message"><button class="p" id="send">Send</button></div></div></div></section>
+<section class="view" id="admin"><div class="card"><h2>Priority matrix</h2><table><tr><th>Tier</th><th>Neutral / Positive</th><th>Negative</th><th>Severe</th></tr><tr><td>Platinum VIP</td><td>High</td><td>High</td><td>High</td></tr><tr><td>Gold</td><td>Medium</td><td>Medium</td><td>High</td></tr><tr><td>Standard</td><td>Low</td><td>Medium</td><td>High</td></tr></table>
+<h2>Routing</h2><table><tr><th>Rule</th><th>Queue</th></tr><tr><td>Platinum VIP</td><td>VIP Queue</td></tr><tr><td>Billing keywords</td><td>Billing</td></tr><tr><td>Everything else</td><td>Tier 2 Technical</td></tr></table></div></section>
+<section class="view" id="analytics"><div class="kpis" id="kpis"></div></section>
+</main>
+<script>
+const $=s=>document.querySelector(s),api=(u,o)=>fetch(u,o).then(r=>r.json()),J=b=>({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+const pill=t=>`<span class="pill ${t}">${t}</span>`;let sel=null,cases=[];
+const tabs=[['console','Service Console'],['portal','Help Portal'],['admin','Rules'],['analytics','Analytics']];
+$('#tabs').innerHTML=tabs.map(([id,l],i)=>`<button role="tab" data-t="${id}" aria-selected="${i==0}">${l}</button>`).join('');
+$('#tabs').onclick=e=>{const t=e.target.dataset.t;if(!t)return;document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==t));document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.t==t));if(t=='analytics')kpis();if(t=='console')load()};
+function left(c){const s=Math.round((c.due*1000-Date.now())/60000);return c.status=='Closed'?'Closed':s<0?'SLA breached':`${Math.floor(s/60)}h ${s%60}m left`}
+async function load(){cases=await api('/api/cases');$('#list').innerHTML=cases.map(c=>`<div class="row ${sel==c.id?'sel':''}" data-id="${c.id}" tabindex="0"><b>${c.number}</b> ${c.subject}<br>${pill(c.priority)} ${pill(c.tier)} ${c.status}</div>`).join('');if(sel)show(sel)}
+$('#list').onclick=e=>{const r=e.target.closest('.row');if(r){sel=+r.dataset.id;load()}};
+function show(id){const c=cases.find(x=>x.id==id);$('#detail').innerHTML=`<h2>${c.subject}</h2><p>${c.customer} · ${pill(c.tier)} · ${left(c)} · ${c.queue}</p>
+<div class="card"><b>AI insights</b><p>${pill(c.sentiment)}</p><p>${c.summary}</p><p><b>Next best action:</b> ${c.action}</p>${c.escalation_reason?`<p><b>Escalation:</b> ${c.escalation_reason}</p>`:''}</div>
+<p><textarea id="reply" rows="3" aria-label="Reply">Hi ${c.customer.split(' ')[0]}, thanks for reaching out. ${c.action}.</textarea></p>
+<button class="p" onclick="setS(${c.id},'Closed')">Send and close</button> <button class="p" onclick="setS(${c.id},'Escalated')">Escalate</button>`}
+async function setS(id,status){await api('/api/cases/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(status=='Escalated'?{status,priority:'High'}:{status})});load()}
+function add(t,c){$('#chat').insertAdjacentHTML('beforeend',`<div class="m ${c}">${t}</div>`);$('#chat').scrollTop=1e9}
+async function send(){const m=$('#msg').value.trim();if(!m)return;$('#msg').value='';add(m,'u');const r=await api('/api/chat',J({message:m,customer:'Portal Guest'}));add(r.reply,'a')}
+$('#send').onclick=send;$('#msg').addEventListener('keydown',e=>{if(e.key==='Enter')send()});add('Hi, I can reset passwords, check a case number, or open a ticket.','a');
+async function kb(){const a=await api('/api/kb?q='+encodeURIComponent($('#kq').value));$('#kb').innerHTML=a.map(x=>`<p><b>${x.title}</b><br>${x.body}</p>`).join('')||'<p>No articles match. Ask the chat.</p>'}
+$('#kq').oninput=kb;kb();
+async function kpis(){const a=await api('/api/analytics');$('#kpis').innerHTML=[['Deflection rate',a.deflection_rate+'%'],['SLA compliance',a.sla_compliance+'%'],['Escalated',a.escalated],['Total cases',a.total]].map(([l,v])=>`<div class="card kpi"><b>${v}</b>${l}</div>`).join('')}
+load();
+</script></body></html>

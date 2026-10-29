@@ -1,0 +1,10 @@
+<template>
+    <lightning-card title="AI Insights" icon-name="standard:einstein_replies">
+        <div class="slds-p-horizontal_medium">
+            <p><span class={pillClass}>{sentiment}</span> <span class="slds-badge">{tier}</span></p>
+            <p class="slds-m-top_small"><b>Summary</b><br />{summary}</p>
+            <p class="slds-m-top_small"><b>Next best action</b><br />{action}</p>
+            <lightning-button class="slds-m-top_small" variant="destructive" label="Escalate to high priority" onclick={escalate}></lightning-button>
+        </div>
+    </lightning-card>
+</template>
